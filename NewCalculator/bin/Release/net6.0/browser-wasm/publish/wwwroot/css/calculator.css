@@ -1,0 +1,26 @@
+﻿.calculator {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.calculator-screen {
+    width: 100%;
+    padding: 20px;
+    text-align: right;
+    align-content: flex-end;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.calculator-keys {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.operator,
+.btn {
+    height: 60px;
+    border:dashed;
+    border-block-style: solid;
+}

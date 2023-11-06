@@ -1,0 +1,269 @@
+﻿@page "/"
+@using NewCalculator.ViewModel;
+@using Newtonsoft.Json;
+
+<PageTitle>Index</PageTitle>
+
+  <div class="container ">
+    <div class="calculator">
+
+       
+
+      <input @bind = "display" type="text" class="calculator-screen form-control" disabled />
+
+      <div class="calculator-keys">
+            <button @onclick="(() => Operator('+'))" type="button" class="operator btn btn-info" value="+">+</button>
+            <button @onclick="(() => Operator('-'))" type="button" class="operator btn btn-info" value="-">-</button>
+            <button @onclick="(() => Operator('*'))" type="button" class="operator btn btn-info" value="*">&times;</button>
+            <button @onclick="(() => Operator('/'))" type="button" class="operator btn btn-info" value="/">&divide;</button>
+
+            <button @onclick=" (()=> AddNum(7))" type="button" class="btn btn-light" value="7">7</button>
+            <button @onclick=" (()=> AddNum(8))" type="button" class="btn btn-light" value="8">8</button>
+            <button @onclick=" (()=> AddNum(9))" type="button" class="btn btn-light" value="9">9</button>
+
+            <button @onclick=" (()=> AddNum(4))" class="btn btn-light" value="4">4</button>
+            <button @onclick=" (()=> AddNum(5))" class="btn btn-light" value="5">5</button>
+            <button @onclick=" (()=> AddNum(6))" class="btn btn-light" value="6">6</button>
+
+            <button @onclick=" (()=> AddNum(1))" type="button" class="btn btn-light" value="1">1</button>
+            <button @onclick=" (()=> AddNum(2))" type="button" class="btn btn-light" value="2">2</button>
+            <button @onclick=" (()=> AddNum(3))" type="button" class="btn btn-light" value="3">3</button>
+
+            <button @onclick=" (()=> AddNum(0))" type="button" class="btn btn-light" value="0">0</button>
+            <button @onclick= "AddPoint" type="button" class="decimal btn btn-dark" value=".">.</button>
+            <button @onclick="AllClear" type="button" class="all-clear btn btn-danger" value="all-clear">AC</button>
+            <button @onclick = "BackSpace" type="button" class="all-clear btn btn-danger" value="all-clear">X</button>
+
+            <button @onclick= "EqualTo" type="button" class="equal-sign btn btn-primary" value="=">=</button>
+            <button @onclick="EqualTo" type="button" class="equal-sign btn btn-danger" value="rm">RM</button>
+            <button @onclick="EqualTo" type="button" class="equal-sign btn btn-secondary" value="rm">M+</button>
+		</div> 
+        
+        <div class="container-fluid p-2 history">
+
+            <span @onclick="GetAllHistory" >View History</span>
+
+			@if (history is not null)
+            {
+                @foreach (var item in history)
+                {
+                    <span class="history-list">
+                        <li>@item.operation  =  @item.result</li>
+                        <button @onclick= "(() => DeleteHistory(item.Id))" class="close">x</button>
+                    </span>
+                    
+
+                }
+            }
+
+		</div>
+    </div>
+  </div>
+
+
+        @code
+{
+    private List<CalculatorDto>? history;
+
+
+
+
+    public string display = "";
+    public List<double> numbers = new List<double>();
+    public char arithmeticOperator;
+    public bool EqualActivated = false;
+    string baseUrl = "https://localhost:7138/api/Calculator";
+
+
+
+    public void AddNum(int num, string point = null)
+    {
+        if (EqualActivated == true)
+        {
+            display = "";
+            EqualActivated = false;
+        }
+
+        if(display.Length <= 25)
+        {
+            if (point != null)
+            {
+                if (display.Length == 0)
+                    display = '0' + point;
+                else display += point;
+            }
+
+            display += num.ToString();
+        }
+    }
+
+    public void AddPoint()
+    {
+        if (!display.Contains('.') && display.Length <= 25)
+        {
+            display += '.';
+        }
+    }
+
+    public void BackSpace()
+    {
+        display = display.Substring(0, display.Length - 1);
+    }
+
+    public void Operator(char sign)
+    {
+        if (arithmeticOperator == '\0')
+        {
+            arithmeticOperator = sign;
+            numbers.Add(double.Parse(display));
+            display = "";
+        }
+    }
+
+    public async void EqualTo()
+    {
+        if (numbers != null && !string.IsNullOrWhiteSpace(display))
+        {
+            double result = 0;
+
+            switch (arithmeticOperator)
+            {
+                case '+':
+                    result = numbers[0] + double.Parse(display);
+                    break;
+                case '-':
+                    result = numbers[0] - double.Parse(display);
+                    break;
+                case '*':
+                    result = numbers[0] * double.Parse(display);
+                    break;
+                case '/':
+                    result = numbers[0] / double.Parse(display);
+                    break;
+                default:
+                    display = "error";
+                    break;
+            }
+
+            if (display == "error")
+            {
+                return;
+            }
+
+            var cal = new CalculatorVM()
+                {
+                    operation = $"{numbers[0].ToString()} {arithmeticOperator} {display}",
+                    result = result.ToString()
+                };
+
+            display = result.ToString();
+            EqualActivated = true;
+
+
+
+
+            bool isSaved = await AddCalculationHistory(cal);
+
+            if (isSaved)
+            {
+                await GetAllHistory();
+            }
+
+        }
+    }
+
+    public void AllClear()
+    {
+        display = "";
+        numbers = new List<double>();
+        arithmeticOperator = '\0';
+    }
+
+
+
+    private async Task GetAllHistory()
+    {
+        try
+        {
+
+
+            using (HttpClient client = new HttpClient())
+            {
+                var message = await client.GetAsync(baseUrl);
+
+                if (!message.IsSuccessStatusCode)
+                {
+                    return;
+                }
+
+                var response = await message.Content.ReadAsStringAsync();
+
+                var result = JsonConvert.DeserializeObject<List<CalculatorDto>>(response);
+
+                history = result;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            throw new Exception(ex.Message);
+        }
+    }
+
+    public async Task DeleteHistory(int Id)
+    {
+        var data = history.FirstOrDefault(x => x.Id == Id);
+        using (HttpClient client = new HttpClient())
+        {
+
+            var responseMessage = await client.DeleteAsync(baseUrl + $"/history?Id={Id}");
+
+            if (responseMessage.IsSuccessStatusCode)
+            {
+                var response = await responseMessage.Content.ReadAsStringAsync();
+
+                if (response.Contains("Success"))
+                {
+                    history.Remove(data);
+                }
+
+            }
+
+
+        }
+    }
+
+    public async Task<bool> AddCalculationHistory(CalculatorVM cal)
+    {
+
+
+        using (HttpClient client = new HttpClient())
+        {
+            try
+            {
+                string requestBody = JsonConvert.SerializeObject(cal);
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync(baseUrl + "/history", content);
+
+                var status = response.StatusCode;
+
+                var message = await response.Content.ReadAsStringAsync();
+
+                var result = JsonConvert.DeserializeObject<CalculatorDto>(message);
+
+                if (result is null)
+                {
+                    return false;
+                }
+
+                return result.operation == cal.operation && result.result == cal.result;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+    }
+}
